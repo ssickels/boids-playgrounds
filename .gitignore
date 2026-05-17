@@ -1,3 +1,5 @@
 # Paid 3D model assets — not included in this repo
 *.glb
 *.png
+.nvm/
+IMG_5817.PNG
