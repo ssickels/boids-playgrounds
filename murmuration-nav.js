@@ -31,6 +31,7 @@
       <a href="https://stevessite.com/monte-carlo.html">Simulator</a>
       <a href="https://stevessite.com/monte-carlo-about.html">About</a>
       <a href="https://stevessite.com/monte-carlo-methodology.html">How It Works</a>
+      <a href="https://stevessite.com/behind-the-assumptions.html">Behind the Assumptions</a>
       <a href="https://github.com/ssickels/r-shiny-portfolio" target="_blank" class="nav-panel-github">GitHub ↗</a>
       </div>
     </div>

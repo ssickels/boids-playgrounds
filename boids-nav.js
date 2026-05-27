@@ -30,6 +30,7 @@
       <a href="https://stevessite.com/monte-carlo.html">Simulator</a>
       <a href="https://stevessite.com/monte-carlo-about.html">About</a>
       <a href="https://stevessite.com/monte-carlo-methodology.html">How It Works</a>
+      <a href="https://stevessite.com/behind-the-assumptions.html">Behind the Assumptions</a>
       <a href="https://github.com/ssickels/r-shiny-portfolio" target="_blank" class="nav-panel-github">GitHub ↗</a>
       </div>
     </div>
@@ -47,7 +48,6 @@
       <a href="https://stevessite.com/boids-about.html">About</a>
       <a href="https://stevessite.com/boids-impl.html">Dev Notes</a>
       <a href="https://github.com/ssickels/boids-playgrounds" target="_blank" class="nav-panel-github">GitHub ↗</a>
-      <a href="https://stevessite.com/about.html" class="nav-panel-top-link" style="padding-left:28px">About This Site</a>
       </div>
     </div>
     <div class="nav-panel-section">
@@ -58,6 +58,9 @@
       <a href="https://stevessite.com/murmuration-waves.html">Density Waves</a>
       <a href="https://stevessite.com/murmuration-intro.html">About</a>
       </div>
+    </div>
+    <div class="nav-panel-section">
+      <a href="https://stevessite.com/about.html" class="nav-panel-top-link">About This Site</a>
     </div>
     <a href="https://stevessite.com/contact.html" class="nav-panel-contact">Contact</a>
   </div>
