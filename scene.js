@@ -444,31 +444,53 @@ aliArrow.visible = false;
 scene.add(aliArrow);
 
 // ── INTER-BOID DISTANCE LINES ─────────────────────────────────────────────────
-// tang-tang pairs + tang-triggerfish pairs
+// tang-tang pairs + tang-triggerfish pairs.
+// Split by force category (separation / alignment / cohesion / triggerfish) into
+// separate line objects so each category's line thickness can track its strength
+// slider — LineMaterial applies one width per object, not per segment.
 const MAX_PAIRS   = NUM_FISH * (NUM_FISH - 1) / 2 + NUM_FISH;
-const _linePosArr = new Float32Array(MAX_PAIRS * 6); // x1y1z1 x2y2z2 per segment
-const _lineColArr = new Float32Array(MAX_PAIRS * 6); // r1g1b1 r2g2b2 per segment
-const _linesGeo   = new LineSegmentsGeometry();
-_linesGeo.setPositions(_linePosArr);
-_linesGeo.setColors(_lineColArr);
-const _linesMat = new LineMaterial({
-  vertexColors: true,
-  linewidth: 3,          // pixels — actual thick lines
-  transparent: true,
-  opacity: 0.85,
-  resolution: new THREE.Vector2(innerWidth, innerHeight),
-});
 // Strip fog and tone mapping from the shader — property flags aren't reliable
 // for LineMaterial; this is the only bulletproof approach.
-_linesMat.onBeforeCompile = (shader) => {
+function _stripFogTone(shader) {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <tonemapping_fragment>', '')
     .replace('#include <fog_fragment>',         '');
-};
-const linesObj = new LineSegments2(_linesGeo, _linesMat);
-linesObj.frustumCulled = false;
-linesObj.visible = false;
-scene.add(linesObj);
+}
+function makeLineObj(width) {
+  const posArr = new Float32Array(MAX_PAIRS * 6); // x1y1z1 x2y2z2 per segment
+  const colArr = new Float32Array(MAX_PAIRS * 6); // r1g1b1 r2g2b2 per segment
+  const geo = new LineSegmentsGeometry();
+  geo.setPositions(posArr);
+  geo.setColors(colArr);
+  const mat = new LineMaterial({
+    vertexColors: true,
+    linewidth: width,      // pixels — actual thick lines
+    transparent: true,
+    opacity: 0.85,
+    resolution: new THREE.Vector2(innerWidth, innerHeight),
+  });
+  mat.onBeforeCompile = _stripFogTone;
+  const obj = new LineSegments2(geo, mat);
+  obj.frustumCulled = false;
+  obj.visible = false;
+  scene.add(obj);
+  return { posArr, colArr, geo, mat, obj };
+}
+const sepLines = makeLineObj(3);
+const aliLines = makeLineObj(3);
+const cohLines = makeLineObj(3);
+const tfLines  = makeLineObj(3);
+const _lineObjs = [sepLines, aliLines, cohLines, tfLines];
+
+// Map a strength weight to a line thickness in pixels. Thin (but still visible)
+// at the slider minimum, comfortably thicker at the max — enough that sliding
+// from min to max is clearly visible without dominating the scene.
+const LINE_W_MIN = 1.5;
+const LINE_W_MAX = 6.0;
+function strengthToWidth(val, maxVal) {
+  const t = Math.min(1, Math.max(0, val / maxVal));
+  return LINE_W_MIN + t * (LINE_W_MAX - LINE_W_MIN);
+}
 
 // ── TRIGGERFISH — SOLO TRAVERSAL ─────────────────────────────────────────────
 const tf = {
@@ -696,7 +718,7 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  _linesMat.resolution.set(innerWidth, innerHeight);
+  for (const l of _lineObjs) l.mat.resolution.set(innerWidth, innerHeight);
 });
 
 // ── ANIMATE ───────────────────────────────────────────────────────────────────
@@ -854,50 +876,58 @@ function animate(ts) {
 
   // ── INTER-BOID LINES ──────────────────────────────────────────────────────
   const showLines = params.SHOW_LINES === true;
-  linesObj.visible = showLines;
+  for (const l of _lineObjs) l.obj.visible = showLines;
   if (showLines) {
+    // Line thickness tracks each force's strength slider.
+    sepLines.mat.linewidth = strengthToWidth(params.W_SEP, 15);
+    aliLines.mat.linewidth = strengthToWidth(params.W_ALI, 8);
+    cohLines.mat.linewidth = strengthToWidth(params.W_COH, 8);
+
     const maxR = Math.max(params.SEP_R, params.ALI_R, params.COH_R);
-    let pi = 0; // position index (floats), pairs rendered
-    let pairs = 0;
-    // tang ↔ tang lines
+    // per-category running counts
+    let sepN = 0, aliN = 0, cohN = 0;
+    // Append one segment (with a solid color) to a given line object.
+    const push = (l, n, ax, ay, az, bx, by, bz, r, g, b) => {
+      const pi = n * 6;
+      l.posArr[pi]   = ax; l.posArr[pi+1] = ay; l.posArr[pi+2] = az;
+      l.posArr[pi+3] = bx; l.posArr[pi+4] = by; l.posArr[pi+5] = bz;
+      l.colArr[pi]   = r;  l.colArr[pi+1] = g;  l.colArr[pi+2] = b;
+      l.colArr[pi+3] = r;  l.colArr[pi+4] = g;  l.colArr[pi+5] = b;
+    };
+    // tang ↔ tang lines — bucket each pair by distance zone
     for (let i = 0; i < boids.length; i++) {
       for (let j = i + 1; j < boids.length; j++) {
         const d = boids[i].pos.distanceTo(boids[j].pos);
         if (d >= maxR) continue;
-        _linePosArr[pi]   = boids[i].pos.x; _linePosArr[pi+1] = boids[i].pos.y; _linePosArr[pi+2] = boids[i].pos.z;
-        _linePosArr[pi+3] = boids[j].pos.x; _linePosArr[pi+4] = boids[j].pos.y; _linePosArr[pi+5] = boids[j].pos.z;
-        // color: red inside SEP_R, yellow inside ALI_R, green inside COH_R
-        let r, g, b;
-        if (d < params.SEP_R)      { r = 1.0; g = 0.0;  b = 0.0;  } // red — separation
-        else if (d < params.ALI_R) { r = 1.0; g = 0.9;  b = 0.0;  } // yellow — alignment
-        else                       { r = 0.0; g = 0.85; b = 0.15; } // green — cohesion
-        const ci = pairs * 6;
-        _lineColArr[ci]   = r; _lineColArr[ci+1] = g; _lineColArr[ci+2] = b;
-        _lineColArr[ci+3] = r; _lineColArr[ci+4] = g; _lineColArr[ci+5] = b;
-        pi += 6;
-        pairs++;
+        const a = boids[i].pos, c = boids[j].pos;
+        if (d < params.SEP_R)      // red — separation
+          push(sepLines, sepN++, a.x, a.y, a.z, c.x, c.y, c.z, 1.0, 0.0,  0.0);
+        else if (d < params.ALI_R) // yellow — alignment
+          push(aliLines, aliN++, a.x, a.y, a.z, c.x, c.y, c.z, 1.0, 0.9,  0.0);
+        else                       // green — cohesion
+          push(cohLines, cohN++, a.x, a.y, a.z, c.x, c.y, c.z, 0.0, 0.85, 0.15);
       }
     }
-    // tang → triggerfish flee lines (orange)
+    // tang → triggerfish flee lines (orange, fixed width)
+    let tfN = 0;
     if (tf.active && tf.mesh) {
       for (let i = 0; i < boids.length; i++) {
         const d = boids[i].pos.distanceTo(tf.pos);
         if (d >= TF_FLEE_R) continue;
-        _linePosArr[pi]   = boids[i].pos.x; _linePosArr[pi+1] = boids[i].pos.y; _linePosArr[pi+2] = boids[i].pos.z;
-        _linePosArr[pi+3] = tf.pos.x;        _linePosArr[pi+4] = tf.pos.y;        _linePosArr[pi+5] = tf.pos.z;
-        const ci = pairs * 6;
-        _lineColArr[ci]   = 1.0; _lineColArr[ci+1] = 0.15; _lineColArr[ci+2] = 0.0; // orange
-        _lineColArr[ci+3] = 1.0; _lineColArr[ci+4] = 0.15; _lineColArr[ci+5] = 0.0;
-        pi += 6;
-        pairs++;
+        const a = boids[i].pos;
+        push(tfLines, tfN++, a.x, a.y, a.z, tf.pos.x, tf.pos.y, tf.pos.z, 1.0, 0.15, 0.0);
       }
     }
-    _linesGeo.instanceCount = pairs;
-    _linesGeo.attributes.instanceStart.data.needsUpdate = true;
-    _linesGeo.attributes.instanceEnd.data.needsUpdate   = true;
-    if (_linesGeo.attributes.instanceColorStart) {
-      _linesGeo.attributes.instanceColorStart.data.needsUpdate = true;
-      _linesGeo.attributes.instanceColorEnd.data.needsUpdate   = true;
+    const counts = [sepN, aliN, cohN, tfN];
+    for (let k = 0; k < _lineObjs.length; k++) {
+      const geo = _lineObjs[k].geo;
+      geo.instanceCount = counts[k];
+      geo.attributes.instanceStart.data.needsUpdate = true;
+      geo.attributes.instanceEnd.data.needsUpdate   = true;
+      if (geo.attributes.instanceColorStart) {
+        geo.attributes.instanceColorStart.data.needsUpdate = true;
+        geo.attributes.instanceColorEnd.data.needsUpdate   = true;
+      }
     }
   }
 
