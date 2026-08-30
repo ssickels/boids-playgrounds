@@ -21,6 +21,8 @@ export const DEFAULTS = {
   TURN_TF:    5.0,   // triggerfish max turn rate (rad/s)
   DAMP_Y:     0.20,  // vertical acceleration damping
   DAMP_Z:     0.50,  // depth acceleration damping
+  VERT_DRAG:  1.0,   // vertical velocity drag (1/s) — bleeds off climb/dive speed;
+                     // higher = flatter, more horizontal schooling. 0 = off.
   SIM_SPEED:    1.0,   // simulation time-scale multiplier
   SHOW_FISH:    true,  // show fish models
   SHOW_SPHERES: false, // show separation radius wireframe spheres
@@ -253,7 +255,7 @@ function createProceduralBlueTang() {
 }
 
 // ── BOIDS — SCHOOLING ─────────────────────────────────────────────────────────
-const NUM_FISH  = 10;
+const NUM_FISH  = 20;
 const BND       = { x: 13, y: 6, z: 5 };
 const MAX_SPEED = 3.0, MIN_SPEED = 1.5, MAX_FORCE = 0.22;
 const TF_FLEE_R = 9.0;
@@ -374,6 +376,14 @@ class Boid {
     this.acc.z *= params.DAMP_Z;
 
     this.vel.addScaledVector(this.acc, dt).clampLength(MIN_SPEED, MAX_SPEED);
+    // Bleed off vertical speed so the school stays broadly horizontal, the way real
+    // fish school. Damping acc.y (DAMP_Y) cannot do this — it also damps the boundary
+    // and cohesion forces that cancel vertical velocity, so vertical drift persists.
+    // Re-clamping afterwards redirects the lost speed into horizontal swimming.
+    if (params.VERT_DRAG > 0) {
+      this.vel.y *= Math.exp(-params.VERT_DRAG * dt);
+      this.vel.clampLength(MIN_SPEED, MAX_SPEED);
+    }
     this.pos.addScaledVector(this.vel, dt);
 
     this.mesh.position.copy(this.pos);

@@ -760,6 +760,13 @@
       <input class="param-slider" type="range" id="sl-DAMP_Z" min="0" max="1" step="0.01" value="0.50">
       <span class="desc-txt">Reduces depth acceleration. Lower = fish scatter more toward/away from the camera.</span>
     </div>
+
+    <div class="param-row">
+      <span class="param-label" title="Vertical drag (VERT_DRAG): bleeds off climb/dive speed in 1/s — higher = flatter, more horizontal schooling; 0 = off">Vertical drag</span>
+      <span class="param-value" id="val-VERT_DRAG">1.0</span>
+      <input class="param-slider" type="range" id="sl-VERT_DRAG" min="0" max="6" step="0.1" value="1.0">
+      <span class="desc-txt">Damps vertical swimming speed. Higher = the school flattens out and fish stop pitching steeply up or down.</span>
+    </div>
   </div>
 
   <!-- View -->
@@ -842,7 +849,7 @@ setTimeout(() => {
 }, 20000);
 
 // ── SLIDER WIRING ─────────────────────────────────────────────────────────────
-const keys = ['SIM_SPEED','SEP_R','ALI_R','COH_R','W_SEP','W_ALI','W_COH','TURN_TANG','TURN_TF','DAMP_Y','DAMP_Z'];
+const keys = ['SIM_SPEED','SEP_R','ALI_R','COH_R','W_SEP','W_ALI','W_COH','TURN_TANG','TURN_TF','DAMP_Y','DAMP_Z','VERT_DRAG'];
 
 for (const key of keys) {
   const slider = document.getElementById(`sl-${key}`);
